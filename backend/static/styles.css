@@ -171,6 +171,11 @@ h2 {
   gap: 18px;
 }
 
+.stack {
+  display: grid;
+  gap: 18px;
+}
+
 .workspace.lower {
   margin-top: 18px;
   grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
@@ -252,6 +257,11 @@ select:focus {
   gap: 14px;
 }
 
+.csv-panel {
+  display: grid;
+  gap: 14px;
+}
+
 .grid-two {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -270,6 +280,47 @@ select:focus {
   color: var(--muted);
   padding: 22px;
   text-align: center;
+}
+
+.csv-preview {
+  overflow: auto;
+  max-height: 420px;
+}
+
+.csv-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+  font-size: 0.86rem;
+}
+
+.csv-table th,
+.csv-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 9px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.csv-table th {
+  color: #344054;
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.csv-table td {
+  overflow-wrap: anywhere;
+}
+
+.csv-table tr.skip-row {
+  opacity: 0.62;
+}
+
+.csv-table input[type="checkbox"] {
+  width: 18px;
+  min-height: 18px;
 }
 
 .candidate,
@@ -357,6 +408,11 @@ select:focus {
 .pill.warn {
   background: #fff7ed;
   color: var(--accent);
+}
+
+.pill.bad {
+  background: #fff1f2;
+  color: var(--danger);
 }
 
 .endpoint-row {

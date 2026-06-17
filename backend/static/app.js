@@ -4,6 +4,7 @@ const state = {
   output: { items: [], events: [] },
   selectedOutputSourceId: "",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  csvRows: [],
 };
 
 const els = {
@@ -30,6 +31,13 @@ const els = {
   refreshSources: document.querySelector("#refreshSources"),
   refreshOutput: document.querySelector("#refreshOutput"),
   copyOutput: document.querySelector("#copyOutput"),
+  csvFile: document.querySelector("#csvFile"),
+  duplicateMode: document.querySelector("#duplicateMode"),
+  selectAllCsv: document.querySelector("#selectAllCsv"),
+  clearCsv: document.querySelector("#clearCsv"),
+  importCsv: document.querySelector("#importCsv"),
+  csvSummary: document.querySelector("#csvSummary"),
+  csvPreview: document.querySelector("#csvPreview"),
 };
 
 const savedKey = localStorage.getItem("geoAtlasAdminKey");
@@ -357,6 +365,227 @@ function selectOutputSource(sourceId) {
   els.outputSource.value = state.selectedOutputSourceId;
 }
 
+function normalizeUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "").toLowerCase();
+}
+
+function splitCsvLine(line) {
+  const cells = [];
+  let current = "";
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function parseCsv(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) {
+    throw new Error("CSV needs a header row and at least one source row.");
+  }
+  const headers = splitCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  const required = ["source name", "base url", "category", "region", "language"];
+  const missing = required.filter((column) => !headers.includes(column));
+  if (missing.length) {
+    throw new Error(`Missing required columns: ${missing.join(", ")}`);
+  }
+  return lines.slice(1).map((line, index) => {
+    const cells = splitCsvLine(line);
+    const record = Object.fromEntries(headers.map((header, columnIndex) => [header, cells[columnIndex] || ""]));
+    return normalizeCsvRecord(record, index + 2);
+  });
+}
+
+function normalizeCsvRecord(record, lineNumber) {
+  const baseUrl = record["base url"]?.trim() || "";
+  const categories = (record.category || "")
+    .split(/[|;]/)
+    .flatMap((part) => part.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const duplicate = state.sources.find((source) => normalizeUrl(source.feed_url) === normalizeUrl(baseUrl));
+  const errors = [];
+  if (!record["source name"]?.trim()) errors.push("source name missing");
+  if (!baseUrl) errors.push("base url missing");
+  try {
+    if (baseUrl) new URL(baseUrl);
+  } catch {
+    errors.push("base url invalid");
+  }
+  return {
+    id: crypto.randomUUID(),
+    lineNumber,
+    selected: errors.length === 0,
+    duplicateId: duplicate?.id || null,
+    duplicateName: duplicate?.name || null,
+    errors,
+    sourceName: record["source name"]?.trim() || "",
+    baseUrl,
+    category: categories,
+    region: record.region?.trim() || "",
+    language: record.language?.trim() || "",
+  };
+}
+
+async function handleCsvFile(file) {
+  if (!file) return;
+  if (!els.adminKey.value.trim()) {
+    showMessage("Enter the generated admin key before importing CSV sources.", "bad");
+    els.csvFile.value = "";
+    return;
+  }
+  if (!state.sources.length) {
+    await loadSources();
+  }
+  try {
+    state.csvRows = parseCsv(await file.text());
+    renderCsvPreview();
+    showMessage(`Loaded ${state.csvRows.length} CSV row${state.csvRows.length === 1 ? "" : "s"}.`);
+  } catch (error) {
+    state.csvRows = [];
+    renderCsvPreview();
+    showMessage(error.message, "bad");
+  }
+}
+
+function renderCsvPreview() {
+  els.selectAllCsv.disabled = state.csvRows.length === 0;
+  els.clearCsv.disabled = state.csvRows.length === 0;
+  els.importCsv.disabled = selectedCsvRows().length === 0;
+  if (!state.csvRows.length) {
+    els.csvSummary.textContent = "No CSV loaded.";
+    els.csvPreview.className = "csv-preview empty";
+    els.csvPreview.innerHTML = "Upload a CSV to review sources before adding them.";
+    return;
+  }
+  const selected = selectedCsvRows().length;
+  const duplicates = state.csvRows.filter((row) => row.duplicateId).length;
+  const invalid = state.csvRows.filter((row) => row.errors.length).length;
+  els.csvSummary.textContent = `${selected}/${state.csvRows.length} selected, ${duplicates} duplicate, ${invalid} invalid`;
+  els.csvPreview.className = "csv-preview";
+  els.csvPreview.innerHTML = `
+    <table class="csv-table">
+      <thead>
+        <tr>
+          <th>Add</th>
+          <th>Source</th>
+          <th>Base URL</th>
+          <th>Category</th>
+          <th>Region</th>
+          <th>Language</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${state.csvRows.map(renderCsvRow).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderCsvRow(row) {
+  const disabled = row.errors.length ? "disabled" : "";
+  const status = row.errors.length
+    ? `<span class="pill bad">${escapeHtml(row.errors.join(", "))}</span>`
+    : row.duplicateId
+      ? `<span class="pill warn">Duplicate: ${escapeHtml(row.duplicateName)}</span>`
+      : `<span class="pill good">New</span>`;
+  return `
+    <tr class="${row.selected ? "" : "skip-row"}" data-row-id="${row.id}">
+      <td><input type="checkbox" ${row.selected ? "checked" : ""} ${disabled} aria-label="Select row ${row.lineNumber}" /></td>
+      <td>${escapeHtml(row.sourceName)}<div class="meta">Line ${row.lineNumber}</div></td>
+      <td>${escapeHtml(row.baseUrl)}</td>
+      <td>${escapeHtml(row.category.join(", "))}</td>
+      <td>${escapeHtml(row.region || "-")}</td>
+      <td>${escapeHtml(row.language || "-")}</td>
+      <td>${status}</td>
+    </tr>
+  `;
+}
+
+function selectedCsvRows() {
+  return state.csvRows.filter((row) => row.selected && !row.errors.length);
+}
+
+function csvPayload(row) {
+  return {
+    name: row.sourceName,
+    feed_url: row.baseUrl,
+    fetch_interval_minutes: Number(els.interval.value || 30),
+    reliability_score: Number(els.reliability.value || 0.7),
+    enabled: true,
+    category_scope: row.category.length ? row.category : null,
+    country_scope: row.region || null,
+    language: row.language || null,
+  };
+}
+
+async function importCsvRows() {
+  const rows = selectedCsvRows();
+  if (!rows.length) return;
+  const done = setBusy(els.importCsv, "Importing...");
+  const mode = els.duplicateMode.value;
+  let added = 0;
+  let overridden = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      if (row.duplicateId) {
+        if (mode === "skip") {
+          skipped += 1;
+          continue;
+        }
+        await api(`/api/v1/sources/${row.duplicateId}`, {
+          method: "PATCH",
+          headers: adminHeaders(),
+          body: JSON.stringify({
+            name: row.sourceName,
+            category_scope: row.category.length ? row.category : null,
+            country_scope: row.region || null,
+            detected_language: row.language || null,
+            enabled: true,
+          }),
+        });
+        overridden += 1;
+        continue;
+      }
+      await api("/api/v1/sources/rss", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify(csvPayload(row)),
+      });
+      added += 1;
+    } catch (error) {
+      failed += 1;
+      row.errors = [error.message];
+      row.selected = false;
+    }
+  }
+  done();
+  await loadSources();
+  renderCsvPreview();
+  showMessage(`CSV import finished: ${added} added, ${overridden} overridden, ${skipped} skipped, ${failed} failed.`, failed ? "bad" : "good");
+}
+
 async function loadOutput(sourceId = state.selectedOutputSourceId) {
   try {
     const suffix = sourceId ? `?source_id=${encodeURIComponent(sourceId)}` : "";
@@ -383,6 +612,33 @@ els.copyOutput.addEventListener("click", async () => {
   showMessage("Output JSON copied.");
 });
 els.adminKey.addEventListener("change", loadSources);
+els.csvFile.addEventListener("change", (event) => handleCsvFile(event.target.files[0]));
+els.duplicateMode.addEventListener("change", renderCsvPreview);
+els.csvPreview.addEventListener("change", (event) => {
+  const checkbox = event.target.closest('input[type="checkbox"]');
+  const rowEl = event.target.closest("[data-row-id]");
+  if (!checkbox || !rowEl) return;
+  const row = state.csvRows.find((item) => item.id === rowEl.dataset.rowId);
+  if (!row) return;
+  row.selected = checkbox.checked;
+  renderCsvPreview();
+});
+els.selectAllCsv.addEventListener("click", () => {
+  const selectable = state.csvRows.filter((row) => !row.errors.length);
+  const shouldSelect = selectable.some((row) => !row.selected);
+  selectable.forEach((row) => {
+    row.selected = shouldSelect;
+  });
+  els.selectAllCsv.textContent = shouldSelect ? "Clear selection" : "Select all";
+  renderCsvPreview();
+});
+els.clearCsv.addEventListener("click", () => {
+  state.csvRows = [];
+  els.csvFile.value = "";
+  els.selectAllCsv.textContent = "Select all";
+  renderCsvPreview();
+});
+els.importCsv.addEventListener("click", importCsvRows);
 
 checkHealth();
 loadSources();

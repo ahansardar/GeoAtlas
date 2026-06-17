@@ -40,6 +40,7 @@ class SourceCreate(BaseModel):
     enabled: bool = True
     category_scope: list[str] | None = None
     country_scope: str | None = None
+    language: str | None = None
 
 
 class SourceUpdate(BaseModel):
@@ -49,6 +50,7 @@ class SourceUpdate(BaseModel):
     enabled: bool | None = None
     category_scope: list[str] | None = None
     country_scope: str | None = None
+    detected_language: str | None = None
 
 
 class SourceResponse(BaseModel):

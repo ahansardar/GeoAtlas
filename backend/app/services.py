@@ -83,7 +83,7 @@ def create_source(db: Session, payload) -> ExternalSource:
         site_url=best.get("site_url"),
         detected_title=best.get("title"),
         detected_feed_type=best.get("feed_type"),
-        detected_language=best.get("language"),
+        detected_language=payload.language or best.get("language"),
         fetch_interval_minutes=payload.fetch_interval_minutes,
         reliability_score=payload.reliability_score,
         enabled=payload.enabled,

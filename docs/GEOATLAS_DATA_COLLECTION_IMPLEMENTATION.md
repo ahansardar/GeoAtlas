@@ -30,6 +30,36 @@ The service provides:
 | OpenAPI | `GET /openapi.json` |
 | Health | `GET /health` |
 
+## CSV Source Import
+
+The GeoAtlas Source Console supports CSV-based source import. The CSV must include these exact headers:
+
+```text
+source name,base url,category,region,language
+```
+
+Behavior:
+
+| Step | Behavior |
+| --- | --- |
+| Upload | Browser parses the CSV locally and previews every row before importing. |
+| Validate | Rows missing `source name` or `base url`, or rows with invalid URLs, are marked invalid and cannot be selected. |
+| Duplicate check | `base url` is compared against existing source `feed_url` values loaded from the backend. |
+| Select rows | Each valid row can be selected or unselected. `Select all` toggles all valid rows. |
+| Duplicate action | Choose `Skip existing links` or `Override existing links` before importing. |
+| Add new | New selected rows call `POST /api/v1/sources/rss`. |
+| Override | Duplicate selected rows call `PATCH /api/v1/sources/{source_id}` for source name, category, region, language, and enabled state. |
+
+CSV column mapping:
+
+| CSV column | Backend field |
+| --- | --- |
+| `source name` | `name` |
+| `base url` | `feed_url` |
+| `category` | `category_scope` |
+| `region` | `country_scope` |
+| `language` | `detected_language` or create-time language override |
+
 ## Supabase Postgres + PostGIS
 
 Supabase project settings are loaded from `.env`:

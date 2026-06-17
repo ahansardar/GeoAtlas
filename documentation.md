@@ -40,6 +40,39 @@ Use this format:
 
 ## Work Log
 
+### 2026-06-17 - CSV Source Import
+
+**Developer:** Ahan
+
+**Goal:** Let users upload a CSV to add many RSS sources, review/select rows before import, and decide how duplicate links should be handled.
+
+**What changed:**
+- `backend/app/schemas.py`: Added optional source language fields for create/update payloads.
+- `backend/app/services.py`: Applies a CSV-provided language override when creating a source.
+- `backend/static/index.html`: Added the CSV import panel with file input, duplicate mode, select-all, clear, import, summary, and preview area.
+- `backend/static/styles.css`: Added CSV preview table styling, row states, and duplicate/invalid badges.
+- `backend/static/app.js`: Added CSV parsing, required-column validation, duplicate detection, row selection, select-all behavior, skip/override duplicate modes, and selected-row import.
+- `docs/GEOATLAS_DATA_COLLECTION_IMPLEMENTATION.md`: Documented CSV format, behavior, and field mapping.
+
+**How to run or verify:**
+- Open `http://127.0.0.1:8000`.
+- Enter a generated admin key and refresh sources.
+- Upload a CSV with columns `source name`, `base url`, `category`, `region`, and `language`.
+- Select or unselect individual rows, or use `Select all`.
+- Choose `Skip existing links` or `Override existing links`.
+- Click `Import selected`.
+
+**Output or result:**
+- CSV rows are previewed before import.
+- Invalid rows are disabled.
+- Existing links are flagged as duplicates.
+- Selected new rows are added as sources.
+- Selected duplicate rows are either skipped or overridden based on the selected duplicate mode.
+
+**Known issues or follow-ups:**
+- Duplicate detection currently compares CSV `base url` to stored `feed_url`. If a website URL redirects or discovers a feed URL already stored under a different URL, the backend may still report it as duplicate during save.
+- Add a backend bulk-import endpoint later if imports become large enough to need server-side batching.
+
 ### 2026-06-17 - Detected Time Zone Display
 
 **Developer:** Ahan

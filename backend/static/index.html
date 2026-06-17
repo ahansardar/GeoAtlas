@@ -23,56 +23,84 @@
       <section class="notice" id="messageBar" hidden></section>
 
       <section class="workspace">
-        <form class="panel source-form" id="detectForm">
-          <div class="panel-heading">
-            <div>
-              <h2>Add RSS feed</h2>
-              <p>Paste an RSS/Atom URL or a website URL that advertises a feed.</p>
+        <section class="stack">
+          <form class="panel source-form" id="detectForm">
+            <div class="panel-heading">
+              <div>
+                <h2>Add RSS feed</h2>
+                <p>Paste an RSS/Atom URL or a website URL that advertises a feed.</p>
+              </div>
             </div>
-          </div>
 
-          <label>
-            Admin key
-            <div class="secret-row">
-              <input id="adminKey" type="password" autocomplete="off" placeholder="Generated GeoAtlas admin key" />
-              <button type="button" id="toggleKey" aria-label="Show admin key">Show</button>
+            <label>
+              Admin key
+              <div class="secret-row">
+                <input id="adminKey" type="password" autocomplete="off" placeholder="Generated GeoAtlas admin key" />
+                <button type="button" id="toggleKey" aria-label="Show admin key">Show</button>
+              </div>
+              <span class="hint">Generate one with <code>python scripts\generate_admin_key.py --name local-admin</code>.</span>
+            </label>
+
+            <label>
+              Feed or website URL
+              <input id="feedUrl" type="url" required placeholder="https://example.org/rss.xml" />
+            </label>
+
+            <div class="grid-two">
+              <label>
+                Source name
+                <input id="sourceName" type="text" placeholder="Auto from feed title" />
+              </label>
+              <label>
+                Fetch interval
+                <input id="interval" type="number" min="5" max="1440" value="30" />
+              </label>
             </div>
-            <span class="hint">Generate one with <code>python scripts\generate_admin_key.py --name local-admin</code>.</span>
-          </label>
 
-          <label>
-            Feed or website URL
-            <input id="feedUrl" type="url" required placeholder="https://example.org/rss.xml" />
-          </label>
+            <div class="grid-two">
+              <label>
+                Reliability
+                <input id="reliability" type="number" min="0" max="1" step="0.05" value="0.7" />
+              </label>
+              <label>
+                Category scope
+                <input id="categories" type="text" placeholder="conflict,humanitarian" />
+              </label>
+            </div>
 
-          <div class="grid-two">
-            <label>
-              Source name
-              <input id="sourceName" type="text" placeholder="Auto from feed title" />
-            </label>
-            <label>
-              Fetch interval
-              <input id="interval" type="number" min="5" max="1440" value="30" />
-            </label>
-          </div>
+            <div class="actions">
+              <button type="submit" class="primary">Detect</button>
+              <button type="button" id="saveSource" disabled>Save source</button>
+              <button type="button" id="clearForm">Clear</button>
+            </div>
+          </form>
 
-          <div class="grid-two">
+          <section class="panel csv-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Import CSV</h2>
+                <p>Required columns: source name, base url, category, region, language.</p>
+              </div>
+            </div>
             <label>
-              Reliability
-              <input id="reliability" type="number" min="0" max="1" step="0.05" value="0.7" />
+              CSV file
+              <input id="csvFile" type="file" accept=".csv,text/csv" />
             </label>
-            <label>
-              Category scope
-              <input id="categories" type="text" placeholder="conflict,humanitarian" />
-            </label>
-          </div>
-
-          <div class="actions">
-            <button type="submit" class="primary">Detect</button>
-            <button type="button" id="saveSource" disabled>Save source</button>
-            <button type="button" id="clearForm">Clear</button>
-          </div>
-        </form>
+            <div class="toolbar">
+              <select id="duplicateMode">
+                <option value="skip">Skip existing links</option>
+                <option value="override">Override existing links</option>
+              </select>
+              <button type="button" id="selectAllCsv" disabled>Select all</button>
+              <button type="button" id="clearCsv" disabled>Clear CSV</button>
+            </div>
+            <div class="actions">
+              <button type="button" class="primary" id="importCsv" disabled>Import selected</button>
+              <span class="meta" id="csvSummary">No CSV loaded.</span>
+            </div>
+            <div id="csvPreview" class="csv-preview empty">Upload a CSV to review sources before adding them.</div>
+          </section>
+        </section>
 
         <section class="panel">
           <div class="panel-heading">
